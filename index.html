@@ -24,72 +24,102 @@
       <header class="hero">
         <div class="brand-row">
           <h1 class="brand">Mi<span>se</span></h1>
-          <div class="stats">
-            <div class="stat"><strong id="recipeCount">—</strong> 道菜</div>
-            <div class="stat"><strong id="ingCount">—</strong> 种食材</div>
-          </div>
+          <p class="tagline">打开冰箱就能做</p>
         </div>
-        <p class="tagline">
-          打开冰箱就能做。用菜名或手头食材，快速找到家常做法。
-        </p>
       </header>
 
-      <section class="panel" aria-label="搜索">
-        <div class="search-grid">
-          <div class="field">
-            <label for="nameSearch">菜名搜索</label>
-            <div class="input-wrap">
-              <input
-                id="nameSearch"
-                type="search"
-                placeholder="试试「土豆丝」「番茄炒蛋」「宫保」"
-                autocomplete="off"
-              />
-              <div id="nameSuggest" class="suggest" role="listbox"></div>
-            </div>
-            <p class="hint">支持俗称与模糊匹配，如土豆丝、番茄炒蛋、宫爆鸡丁</p>
-          </div>
-
-          <div class="field">
-            <label for="ingSearch">食材多选</label>
-            <div class="input-wrap">
-              <input
-                id="ingSearch"
-                type="search"
-                placeholder="输入食材，如「土豆」「虾」「豆腐」"
-                autocomplete="off"
-              />
-              <div id="ingSuggest" class="suggest" role="listbox"></div>
-            </div>
-            <div id="selectedIngs" class="chips" aria-live="polite"></div>
-            <p class="hint">可多选；结果需同时包含所选食材（马铃薯=土豆）</p>
-          </div>
+      <section class="compact-bar" aria-label="搜索">
+        <div class="input-wrap grow">
+          <input
+            id="nameSearch"
+            type="search"
+            placeholder="搜菜名，如土豆丝、宫保…"
+            autocomplete="off"
+          />
+          <div id="nameSuggest" class="suggest" role="listbox"></div>
         </div>
-
-        <div id="facets" class="facets" aria-label="筛选维度"></div>
+        <button type="button" class="filter-btn" id="openFilter" aria-haspopup="dialog">
+          筛选
+          <span class="filter-count" id="filterCount" hidden>0</span>
+        </button>
+        <div class="view-toggle" role="group" aria-label="列表视图">
+          <button type="button" class="view-btn active" id="viewGrid" title="双列" aria-pressed="true">
+            ▦
+          </button>
+          <button type="button" class="view-btn" id="viewList" title="列表" aria-pressed="false">
+            ☰
+          </button>
+        </div>
       </section>
 
+      <div id="activeSummary" class="active-summary" hidden></div>
+
       <div class="toolbar">
-        <div>
-          <h2>菜谱</h2>
-          <div class="meta" id="resultMeta">加载中…</div>
-        </div>
-        <button type="button" class="clear-btn" id="clearFilters">清除筛选</button>
+        <div class="meta" id="resultMeta">加载中…</div>
       </div>
 
-      <main id="results" class="grid" aria-live="polite"></main>
+      <main id="results" class="grid view-grid" aria-live="polite"></main>
 
       <footer>
-        Mise · 家常菜谱手册 ·
+        Mise · 家常菜谱 ·
         <a href="https://github.com/jon-hao/Mise">GitHub</a>
       </footer>
     </div>
 
+    <!-- 筛选弹窗 -->
+    <div id="filterModal" class="modal" aria-hidden="true">
+      <div class="sheet filter-sheet" role="dialog" aria-modal="true" aria-labelledby="filterTitle">
+        <div class="sheet-head">
+          <h2 id="filterTitle">筛选</h2>
+          <button class="close-btn" id="closeFilter" type="button" aria-label="关闭">×</button>
+        </div>
+
+        <div class="field">
+          <label for="ingSearch">食材（可多选）</label>
+          <div class="input-wrap">
+            <input
+              id="ingSearch"
+              type="search"
+              placeholder="土豆、虾、豆腐…"
+              autocomplete="off"
+            />
+            <div id="ingSuggest" class="suggest" role="listbox"></div>
+          </div>
+          <div id="selectedIngs" class="chips" aria-live="polite"></div>
+        </div>
+
+        <div class="field time-field">
+          <label for="timeMax">
+            用时上限
+            <strong id="timeMaxLabel">60 分钟</strong>
+          </label>
+          <input
+            id="timeMax"
+            type="range"
+            min="10"
+            max="60"
+            step="5"
+            value="60"
+          />
+          <div class="time-ticks">
+            <span>10分</span>
+            <span>30分</span>
+            <span>1小时</span>
+          </div>
+        </div>
+
+        <div id="facets" class="facets" aria-label="筛选维度"></div>
+
+        <div class="filter-actions">
+          <button type="button" class="clear-btn" id="clearFilters">清除</button>
+          <button type="button" class="apply-btn" id="applyFilter">看结果</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 菜谱详情 -->
     <div id="modal" class="modal" aria-hidden="true">
       <div class="sheet" id="sheet" role="dialog" aria-modal="true"></div>
-      <button id="closeModal" class="close-btn" style="display: none" type="button">
-        ×
-      </button>
     </div>
 
     <script src="./app.js"></script>

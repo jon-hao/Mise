@@ -1,4 +1,6 @@
 (() => {
+  const TIME_MAX_DEFAULT = 60;
+
   const state = {
     data: null,
     query: "",
@@ -7,10 +9,9 @@
       categories: new Set(),
       methods: new Set(),
       tastes: new Set(),
-      scenes: new Set(),
-      protein: new Set(),
-      difficulty: new Set(),
     },
+    timeMax: TIME_MAX_DEFAULT,
+    view: "grid",
     activeSuggest: -1,
   };
 
@@ -24,11 +25,18 @@
     results: document.getElementById("results"),
     resultMeta: document.getElementById("resultMeta"),
     clearBtn: document.getElementById("clearFilters"),
-    recipeCount: document.getElementById("recipeCount"),
-    ingCount: document.getElementById("ingCount"),
+    openFilter: document.getElementById("openFilter"),
+    closeFilter: document.getElementById("closeFilter"),
+    applyFilter: document.getElementById("applyFilter"),
+    filterModal: document.getElementById("filterModal"),
+    filterCount: document.getElementById("filterCount"),
+    activeSummary: document.getElementById("activeSummary"),
+    timeMax: document.getElementById("timeMax"),
+    timeMaxLabel: document.getElementById("timeMaxLabel"),
+    viewGrid: document.getElementById("viewGrid"),
+    viewList: document.getElementById("viewList"),
     modal: document.getElementById("modal"),
     sheet: document.getElementById("sheet"),
-    closeModal: document.getElementById("closeModal"),
   };
 
   function normalize(s) {
@@ -45,13 +53,11 @@
     if (!h) return 0;
     if (h === n) return 100;
     if (h.includes(n)) return 80 - Math.min(20, h.indexOf(n));
-    // subsequence
     let i = 0;
     for (const ch of h) {
       if (ch === n[i]) i += 1;
       if (i >= n.length) return 40;
     }
-    // char overlap
     let hit = 0;
     for (const ch of n) if (h.includes(ch)) hit += 1;
     return (hit / n.length) * 25;
@@ -59,6 +65,17 @@
 
   function recipeSearchText(r) {
     return [r.name, ...(r.aliases || []), ...(r.ingredients || [])].join(" ");
+  }
+
+  function recipeMinutes(r) {
+    if (typeof r.timeMinutes === "number") return r.timeMinutes;
+    const map = { "约10分钟": 10, "约15分钟": 15, "约30分钟": 30, "约1小时": 60 };
+    return map[r.time] || 30;
+  }
+
+  function formatTimeShort(mins) {
+    if (mins >= 60) return "约1小时";
+    return mins + "分钟";
   }
 
   function matchRecipe(r) {
@@ -73,7 +90,8 @@
     }
 
     if (state.selectedIngredients.length) {
-      const ingBlob = (r.ingredients || []).join(" ") + " " + (r.ingredientsText || "");
+      const ingBlob =
+        (r.ingredients || []).join(" ") + " " + (r.ingredientsText || "");
       const ok = state.selectedIngredients.every((ing) => {
         const aliases = findIngAliases(ing);
         return aliases.some((a) => normalize(ingBlob).includes(normalize(a)));
@@ -81,11 +99,12 @@
       if (!ok) return null;
     }
 
+    if (recipeMinutes(r) > state.timeMax) return null;
+
     for (const key of Object.keys(state.facets)) {
       const set = state.facets[key];
       if (!set.size) continue;
-      const values =
-        key === "difficulty" ? [r.difficulty] : r[key] || [];
+      const values = r[key] || [];
       if (![...set].some((v) => values.includes(v))) return null;
     }
     return r;
@@ -115,20 +134,92 @@
     return score;
   }
 
+  function activeFilterCount() {
+    let n = state.selectedIngredients.length;
+    Object.values(state.facets).forEach((s) => {
+      n += s.size;
+    });
+    if (state.timeMax < TIME_MAX_DEFAULT) n += 1;
+    return n;
+  }
+
+  function updateFilterBadge() {
+    const n = activeFilterCount();
+    if (n > 0) {
+      els.filterCount.hidden = false;
+      els.filterCount.textContent = String(n);
+    } else {
+      els.filterCount.hidden = true;
+    }
+  }
+
+  function renderActiveSummary() {
+    const chips = [];
+    state.selectedIngredients.forEach((name) => {
+      chips.push({ kind: "ing", label: name, clear: () => removeIngredient(name) });
+    });
+    Object.entries(state.facets).forEach(([key, set]) => {
+      set.forEach((v) => {
+        chips.push({
+          kind: "facet",
+          label: v,
+          clear: () => {
+            state.facets[key].delete(v);
+            renderFacets();
+            refresh();
+          },
+        });
+      });
+    });
+    if (state.timeMax < TIME_MAX_DEFAULT) {
+      chips.push({
+        kind: "time",
+        label: "≤" + formatTimeShort(state.timeMax),
+        clear: () => {
+          state.timeMax = TIME_MAX_DEFAULT;
+          els.timeMax.value = String(TIME_MAX_DEFAULT);
+          updateTimeLabel();
+          refresh();
+        },
+      });
+    }
+
+    els.activeSummary.innerHTML = "";
+    if (!chips.length) {
+      els.activeSummary.hidden = true;
+      return;
+    }
+    els.activeSummary.hidden = false;
+    chips.forEach((c) => {
+      const el = document.createElement("span");
+      el.className = "chip summary";
+      el.innerHTML =
+        escapeHtml(c.label) +
+        '<button type="button" aria-label="移除">×</button>';
+      el.querySelector("button").addEventListener("click", (e) => {
+        e.stopPropagation();
+        c.clear();
+      });
+      els.activeSummary.appendChild(el);
+    });
+  }
+
+  function removeIngredient(name) {
+    state.selectedIngredients = state.selectedIngredients.filter((x) => x !== name);
+    renderSelectedIngs();
+    refresh();
+  }
+
   function renderSelectedIngs() {
     els.selectedIngs.innerHTML = "";
     state.selectedIngredients.forEach((name) => {
       const chip = document.createElement("span");
       chip.className = "chip ingredient";
       chip.innerHTML =
-        name +
+        escapeHtml(name) +
         '<button type="button" aria-label="移除">×</button>';
       chip.querySelector("button").addEventListener("click", () => {
-        state.selectedIngredients = state.selectedIngredients.filter(
-          (x) => x !== name
-        );
-        renderSelectedIngs();
-        renderResults();
+        removeIngredient(name);
       });
       els.selectedIngs.appendChild(chip);
     });
@@ -138,7 +229,7 @@
     if (!state.selectedIngredients.includes(name)) {
       state.selectedIngredients.push(name);
       renderSelectedIngs();
-      renderResults();
+      refresh();
     }
     els.ingInput.value = "";
     closeSuggest(els.ingSuggest);
@@ -156,11 +247,10 @@
       closeSuggest(el);
       return;
     }
-    items.forEach((item, idx) => {
+    items.forEach((item) => {
       const btn = document.createElement("button");
       btn.type = "button";
       btn.textContent = item.label;
-      btn.dataset.idx = String(idx);
       btn.addEventListener("mousedown", (e) => {
         e.preventDefault();
         onPick(item.value);
@@ -200,7 +290,8 @@
           fuzzyScore(i.name, q),
           ...(i.aliases || []).map((a) => fuzzyScore(a, q))
         );
-        return { value: i.name, label: i.name + (i.aliases && i.aliases[1] ? ` · ${i.aliases[1]}` : ""), score };
+        const alias = i.aliases && i.aliases[1] ? ` · ${i.aliases[1]}` : "";
+        return { value: i.name, label: i.name + alias, score };
       })
       .filter((x) => x.score >= 28)
       .sort((a, b) => b.score - a.score)
@@ -212,13 +303,10 @@
       categories: "分类",
       methods: "做法",
       tastes: "口味",
-      scenes: "场景",
-      protein: "食材类型",
-      difficulty: "难度",
     };
     els.facets.innerHTML = "";
     Object.keys(labels).forEach((key) => {
-      const values = state.data.facets[key] || [];
+      const values = (state.data.facets && state.data.facets[key]) || [];
       if (!values.length) return;
       const row = document.createElement("div");
       row.className = "facet-row";
@@ -234,7 +322,7 @@
           if (state.facets[key].has(v)) state.facets[key].delete(v);
           else state.facets[key].add(v);
           renderFacets();
-          renderResults();
+          refresh();
         });
         pills.appendChild(btn);
       });
@@ -243,22 +331,36 @@
     });
   }
 
+  function setView(view) {
+    state.view = view;
+    els.results.classList.toggle("view-grid", view === "grid");
+    els.results.classList.toggle("view-list", view === "list");
+    els.viewGrid.classList.toggle("active", view === "grid");
+    els.viewList.classList.toggle("active", view === "list");
+    els.viewGrid.setAttribute("aria-pressed", view === "grid" ? "true" : "false");
+    els.viewList.setAttribute("aria-pressed", view === "list" ? "true" : "false");
+    try {
+      localStorage.setItem("mise-view", view);
+    } catch (_) {}
+  }
+
   function renderResults() {
     const matched = state.data.recipes
       .map(matchRecipe)
       .filter(Boolean)
       .sort((a, b) => rankRecipe(b) - rankRecipe(a));
 
-    els.resultMeta.textContent = `找到 ${matched.length} 道菜`;
+    els.resultMeta.textContent = `共 ${matched.length} 道菜`;
     els.results.innerHTML = "";
 
     if (!matched.length) {
       els.results.innerHTML =
-        '<div class="empty">没有匹配的菜谱。试试更短的菜名，或少选几样食材。</div>';
+        '<div class="empty">没有匹配的菜谱。试试放宽用时或少选食材。</div>';
       return;
     }
 
     matched.forEach((r, i) => {
+      const mins = recipeMinutes(r);
       const card = document.createElement("button");
       card.type = "button";
       card.className = "card";
@@ -266,14 +368,16 @@
       const tags = [
         ...(r.categories || []).slice(0, 1),
         ...(r.tastes || []).slice(0, 1),
-        r.time,
+        ...(r.methods || []).slice(0, 1),
       ];
       card.innerHTML = `
         <div class="card-top">
           <h3>${escapeHtml(r.name)}</h3>
-          <span class="badge">${escapeHtml(r.difficulty)}</span>
+          <span class="badge">${escapeHtml(formatTimeShort(mins))}</span>
         </div>
-        <p class="card-ings">${escapeHtml((r.ingredients || []).join(" · ") || "查看详情")}</p>
+        <p class="card-ings">${escapeHtml(
+          (r.ingredients || []).join(" · ") || "查看详情"
+        )}</p>
         <div class="card-tags">${tags
           .map((t) => `<span class="mini">${escapeHtml(t)}</span>`)
           .join("")}</div>
@@ -281,6 +385,12 @@
       card.addEventListener("click", () => openRecipe(r));
       els.results.appendChild(card);
     });
+  }
+
+  function refresh() {
+    updateFilterBadge();
+    renderActiveSummary();
+    renderResults();
   }
 
   function escapeHtml(s) {
@@ -303,11 +413,16 @@
         <button class="close-btn" id="closeModalInner" type="button" aria-label="关闭">×</button>
       </div>
       <div class="sheet-meta">
-        <span class="mini">${escapeHtml(r.time)}</span>
-        <span class="mini">${escapeHtml(r.difficulty)}</span>
-        ${(r.categories || []).map((c) => `<span class="mini">${escapeHtml(c)}</span>`).join("")}
-        ${(r.methods || []).map((c) => `<span class="mini">${escapeHtml(c)}</span>`).join("")}
-        ${(r.tastes || []).map((c) => `<span class="mini">${escapeHtml(c)}</span>`).join("")}
+        <span class="mini">${escapeHtml(formatTimeShort(recipeMinutes(r)))}</span>
+        ${(r.categories || [])
+          .map((c) => `<span class="mini">${escapeHtml(c)}</span>`)
+          .join("")}
+        ${(r.methods || [])
+          .map((c) => `<span class="mini">${escapeHtml(c)}</span>`)
+          .join("")}
+        ${(r.tastes || [])
+          .map((c) => `<span class="mini">${escapeHtml(c)}</span>`)
+          .join("")}
       </div>
       <div class="section">
         <h3>食材</h3>
@@ -315,7 +430,9 @@
       </div>
       ${
         r.sauceText
-          ? `<div class="section"><h3>料汁 / 调味</h3><p>${escapeHtml(r.sauceText)}</p></div>`
+          ? `<div class="section"><h3>料汁 / 调味</h3><p>${escapeHtml(
+              r.sauceText
+            )}</p></div>`
           : ""
       }
       <div class="section">
@@ -326,24 +443,41 @@
       </div>
     `;
     els.modal.classList.add("open");
-    document.getElementById("closeModalInner").addEventListener("click", closeModal);
+    document
+      .getElementById("closeModalInner")
+      .addEventListener("click", closeRecipeModal);
   }
 
-  function closeModal() {
+  function closeRecipeModal() {
     els.modal.classList.remove("open");
   }
 
+  function openFilterModal() {
+    els.filterModal.classList.add("open");
+  }
+
+  function closeFilterModal() {
+    els.filterModal.classList.remove("open");
+    closeSuggest(els.ingSuggest);
+  }
+
+  function updateTimeLabel() {
+    const v = Number(els.timeMax.value) || TIME_MAX_DEFAULT;
+    els.timeMaxLabel.textContent =
+      v >= 60 ? "不限（1小时内）" : "≤ " + v + " 分钟";
+  }
+
   function clearAll() {
-    state.query = "";
     state.selectedIngredients = [];
     Object.values(state.facets).forEach((s) => s.clear());
-    els.nameInput.value = "";
+    state.timeMax = TIME_MAX_DEFAULT;
+    els.timeMax.value = String(TIME_MAX_DEFAULT);
     els.ingInput.value = "";
-    closeSuggest(els.nameSuggest);
+    updateTimeLabel();
     closeSuggest(els.ingSuggest);
     renderSelectedIngs();
     renderFacets();
-    renderResults();
+    refresh();
   }
 
   function wireEvents() {
@@ -353,17 +487,25 @@
         state.query = name;
         els.nameInput.value = name;
         closeSuggest(els.nameSuggest);
-        renderResults();
+        refresh();
       });
-      renderResults();
+      refresh();
     });
 
     els.ingInput.addEventListener("input", () => {
-      openSuggest(els.ingSuggest, suggestIngredients(els.ingInput.value), addIngredient);
+      openSuggest(
+        els.ingSuggest,
+        suggestIngredients(els.ingInput.value),
+        addIngredient
+      );
     });
 
     els.ingInput.addEventListener("focus", () => {
-      openSuggest(els.ingSuggest, suggestIngredients(els.ingInput.value), addIngredient);
+      openSuggest(
+        els.ingSuggest,
+        suggestIngredients(els.ingInput.value),
+        addIngredient
+      );
     });
 
     els.nameInput.addEventListener("keydown", (e) => {
@@ -371,13 +513,17 @@
         state.query = label;
         els.nameInput.value = label;
         closeSuggest(els.nameSuggest);
-        renderResults();
+        refresh();
       });
     });
 
     els.ingInput.addEventListener("keydown", (e) => {
       handleSuggestKeys(e, els.ingSuggest, addIngredient);
-      if (e.key === "Enter" && els.ingInput.value.trim() && state.activeSuggest < 0) {
+      if (
+        e.key === "Enter" &&
+        els.ingInput.value.trim() &&
+        state.activeSuggest < 0
+      ) {
         const first = suggestIngredients(els.ingInput.value)[0];
         if (first) addIngredient(first.value);
       }
@@ -392,13 +538,31 @@
       }
     });
 
+    els.timeMax.addEventListener("input", () => {
+      state.timeMax = Number(els.timeMax.value) || TIME_MAX_DEFAULT;
+      updateTimeLabel();
+      refresh();
+    });
+
+    els.openFilter.addEventListener("click", openFilterModal);
+    els.closeFilter.addEventListener("click", closeFilterModal);
+    els.applyFilter.addEventListener("click", closeFilterModal);
     els.clearBtn.addEventListener("click", clearAll);
-    els.closeModal.addEventListener("click", closeModal);
+    els.filterModal.addEventListener("click", (e) => {
+      if (e.target === els.filterModal) closeFilterModal();
+    });
+
+    els.viewGrid.addEventListener("click", () => setView("grid"));
+    els.viewList.addEventListener("click", () => setView("list"));
+
     els.modal.addEventListener("click", (e) => {
-      if (e.target === els.modal) closeModal();
+      if (e.target === els.modal) closeRecipeModal();
     });
     document.addEventListener("keydown", (e) => {
-      if (e.key === "Escape") closeModal();
+      if (e.key === "Escape") {
+        if (els.filterModal.classList.contains("open")) closeFilterModal();
+        else closeRecipeModal();
+      }
     });
   }
 
@@ -420,18 +584,24 @@
     } else {
       return;
     }
-    buttons.forEach((b, i) => b.classList.toggle("active", i === state.activeSuggest));
+    buttons.forEach((b, i) =>
+      b.classList.toggle("active", i === state.activeSuggest)
+    );
   }
 
   async function init() {
-    const res = await fetch("./data/recipes.json?v=1");
+    const res = await fetch("./data/recipes.json?v=2");
     state.data = await res.json();
-    els.recipeCount.textContent = String(state.data.recipeCount || state.data.recipes.length);
-    els.ingCount.textContent = String((state.data.ingredients || []).length);
+    try {
+      const saved = localStorage.getItem("mise-view");
+      if (saved === "list" || saved === "grid") state.view = saved;
+    } catch (_) {}
+    setView(state.view);
+    updateTimeLabel();
     wireEvents();
     renderSelectedIngs();
     renderFacets();
-    renderResults();
+    refresh();
   }
 
   init().catch((err) => {
