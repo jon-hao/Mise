@@ -679,9 +679,21 @@
     );
   }
 
+  async function loadData() {
+    // 优先读 recipes.txt：改 txt 推送后站点直接更新，无需再构建 JSON
+    const txtRes = await fetch("./recipes.txt", { cache: "no-cache" });
+    if (txtRes.ok && typeof MiseParseRecipesTxt === "function") {
+      const raw = await txtRes.text();
+      const parsed = MiseParseRecipesTxt(raw);
+      if (parsed && parsed.recipes && parsed.recipes.length) return parsed;
+    }
+    // 回退：预构建 JSON
+    const res = await fetch("./data/recipes.json", { cache: "no-cache" });
+    return res.json();
+  }
+
   async function init() {
-    const res = await fetch("./data/recipes.json?v=3");
-    state.data = await res.json();
+    state.data = await loadData();
     try {
       const saved = localStorage.getItem("mise-view");
       if (saved === "list" || saved === "grid") state.view = saved;

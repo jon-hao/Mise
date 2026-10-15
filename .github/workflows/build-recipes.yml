@@ -1,5 +1,8 @@
 name: Build recipes from txt
 
+# 可选：同步生成 data/recipes.json 作为回退。
+# 网站已直接读取 recipes.txt，即使本工作流失败也不影响上线。
+
 on:
   push:
     branches: [main]
@@ -16,16 +19,21 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build recipes.json
         run: python3 scripts/build-recipes.py
 
-      - name: Commit updated JSON
-        uses: stefanzweifel/git-auto-commit-action@v5
-        with:
-          commit_message: "chore: rebuild recipes.json from recipes.txt"
-          file_pattern: data/recipes.json
-          commit_user_name: github-actions[bot]
-          commit_user_email: github-actions[bot]@users.noreply.github.com
+      - name: Commit if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/recipes.json
+          if git diff --staged --quiet; then
+            echo "No changes"
+          else
+            git commit -m "chore: rebuild recipes.json from recipes.txt"
+            git push
+          fi

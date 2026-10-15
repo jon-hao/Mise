@@ -10,13 +10,11 @@
 
 1. 编辑 `recipes.txt`（增删改菜谱）
 2. 提交并推送到 `main`
-3. GitHub Actions 会自动运行 `scripts/build-recipes.py`，生成 `data/recipes.json`
-4. GitHub Pages 随后更新网站
+3. GitHub Pages 更新后，网站会**直接读取**该 txt，菜谱立即生效
 
-本地预览前也可手动构建：
+可选：本地或 Actions 也可运行 `python3 scripts/build-recipes.py`，生成 `data/recipes.json` 作为回退缓存。
 
 ```bash
-python3 scripts/build-recipes.py
 python3 -m http.server 5173
 # 打开 http://localhost:5173
 ```
