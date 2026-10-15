@@ -56,6 +56,17 @@ input {
   font: inherit;
 }
 
+/* 弹窗打开时锁住背后页面滚动（配合 JS 记录 scrollY） */
+body.modal-open {
+  position: fixed;
+  left: 0;
+  right: 0;
+  width: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+  touch-action: none;
+}
+
 .app {
   position: relative;
   z-index: 1;
@@ -517,6 +528,8 @@ input {
   justify-content: center;
   background: rgba(20, 40, 32, 0.42);
   padding: 16px;
+  overscroll-behavior: none;
+  touch-action: none;
 }
 
 .modal.open {
@@ -528,6 +541,9 @@ input {
   width: min(720px, 100%);
   max-height: min(88vh, 900px);
   overflow: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
   background: #fff;
   border-radius: 28px 28px 22px 22px;
   padding: 20px 20px 24px;

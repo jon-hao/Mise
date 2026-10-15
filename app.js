@@ -13,6 +13,8 @@
     timeMax: TIME_MAX_DEFAULT,
     view: "grid",
     activeSuggest: -1,
+    scrollY: 0,
+    scrollLocked: false,
   };
 
   const els = {
@@ -401,6 +403,88 @@
       .replace(/"/g, "&quot;");
   }
 
+  function anyModalOpen() {
+    return (
+      els.modal.classList.contains("open") ||
+      els.filterModal.classList.contains("open")
+    );
+  }
+
+  function lockBodyScroll() {
+    if (state.scrollLocked) return;
+    state.scrollY = window.scrollY || window.pageYOffset || 0;
+    state.scrollLocked = true;
+    document.body.classList.add("modal-open");
+    document.body.style.top = "-" + state.scrollY + "px";
+  }
+
+  function unlockBodyScroll() {
+    if (!state.scrollLocked) return;
+    if (anyModalOpen()) return;
+    state.scrollLocked = false;
+    document.body.classList.remove("modal-open");
+    document.body.style.top = "";
+    window.scrollTo(0, state.scrollY);
+  }
+
+  function syncBodyScrollLock() {
+    if (anyModalOpen()) lockBodyScroll();
+    else unlockBodyScroll();
+  }
+
+  /** 遮罩上的滑动不传到背后页面；弹窗内部仍可滚 */
+  function trapModalScroll(modalEl) {
+    let lastY = 0;
+    modalEl.addEventListener(
+      "touchstart",
+      (e) => {
+        if (e.touches[0]) lastY = e.touches[0].clientY;
+      },
+      { passive: true }
+    );
+
+    modalEl.addEventListener(
+      "touchmove",
+      (e) => {
+        if (!modalEl.classList.contains("open")) return;
+        const sheet = e.target.closest(".sheet");
+        if (!sheet) {
+          e.preventDefault();
+          return;
+        }
+        const y = e.touches[0] ? e.touches[0].clientY : lastY;
+        const dy = y - lastY;
+        lastY = y;
+        const atTop = sheet.scrollTop <= 0;
+        const atBottom =
+          sheet.scrollTop + sheet.clientHeight >= sheet.scrollHeight - 1;
+        if ((atTop && dy > 0) || (atBottom && dy < 0)) {
+          e.preventDefault();
+        }
+      },
+      { passive: false }
+    );
+
+    modalEl.addEventListener(
+      "wheel",
+      (e) => {
+        if (!modalEl.classList.contains("open")) return;
+        const sheet = e.target.closest(".sheet");
+        if (!sheet) {
+          e.preventDefault();
+          return;
+        }
+        const atTop = sheet.scrollTop <= 0;
+        const atBottom =
+          sheet.scrollTop + sheet.clientHeight >= sheet.scrollHeight - 1;
+        if ((atTop && e.deltaY < 0) || (atBottom && e.deltaY > 0)) {
+          e.preventDefault();
+        }
+      },
+      { passive: false }
+    );
+  }
+
   function openRecipe(r) {
     const aliases =
       (r.aliases || []).filter((a) => a !== r.name).join(" / ") || "";
@@ -443,6 +527,7 @@
       </div>
     `;
     els.modal.classList.add("open");
+    syncBodyScrollLock();
     document
       .getElementById("closeModalInner")
       .addEventListener("click", closeRecipeModal);
@@ -450,15 +535,18 @@
 
   function closeRecipeModal() {
     els.modal.classList.remove("open");
+    syncBodyScrollLock();
   }
 
   function openFilterModal() {
     els.filterModal.classList.add("open");
+    syncBodyScrollLock();
   }
 
   function closeFilterModal() {
     els.filterModal.classList.remove("open");
     closeSuggest(els.ingSuggest);
+    syncBodyScrollLock();
   }
 
   function updateTimeLabel() {
@@ -558,10 +646,12 @@
     els.modal.addEventListener("click", (e) => {
       if (e.target === els.modal) closeRecipeModal();
     });
+    trapModalScroll(els.modal);
+    trapModalScroll(els.filterModal);
     document.addEventListener("keydown", (e) => {
       if (e.key === "Escape") {
         if (els.filterModal.classList.contains("open")) closeFilterModal();
-        else closeRecipeModal();
+        else if (els.modal.classList.contains("open")) closeRecipeModal();
       }
     });
   }
