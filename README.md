@@ -4,6 +4,46 @@
 
 **在线地址：** https://jon-hao.github.io/Mise/
 
+## 更新菜谱（只改一个文件）
+
+源文件是仓库根目录的 **[`recipes.txt`](./recipes.txt)**。
+
+1. 编辑 `recipes.txt`（增删改菜谱）
+2. 提交并推送到 `main`
+3. GitHub Actions 会自动运行 `scripts/build-recipes.py`，生成 `data/recipes.json`
+4. GitHub Pages 随后更新网站
+
+本地预览前也可手动构建：
+
+```bash
+python3 scripts/build-recipes.py
+python3 -m http.server 5173
+# 打开 http://localhost:5173
+```
+
+### `recipes.txt` 格式
+
+```text
+1.香菇青菜
+食材：香菇150g，青菜250g，蒜沫
+料汁：2勺生抽，1勺蚝油，半茶匙盐，1勺淀粉，半碗清水
+做法：
+香菇切片，蒜切沫
+水烧开倒入香菇和青菜，焯水30秒
+锅中喷油，锅热倒入蒜末炒香
+倒入焯好水的香菇青菜，料汁，翻炒一会儿，收汁出锅
+
+2.菜花炒肉
+食材：...
+做法：
+...
+```
+
+- 每道菜以 `数字.菜名` 开头
+- `食材：` / `料汁：`（或 `调料：`）可选
+- `做法：` 后每行一步
+- `#` 开头为注释
+
 ## 能怎么搜
 
 | 维度 | 说明 | 例子 |
@@ -17,19 +57,6 @@
 
 主界面突出菜谱列表；支持双列卡片与单列列表切换。
 
-## 本地预览
-
-```bash
-# 任意静态服务器即可，例如：
-python3 -m http.server 5173
-# 打开 http://localhost:5173
-```
-
-## 数据
-
-- 原始菜谱文本：`_recipes_raw.txt`
-- 结构化数据：`data/recipes.json`（103 道）
-
 ## 设计参考
 
-参考下厨房 / BBC Good Food 等：顶部强搜索、食材多选 chips、分组筛选、结果计数与可点卡片详情。视觉走清新绿意 + 珊瑚点缀，适合美食教程气质。
+参考下厨房 / BBC Good Food 等：顶部强搜索、食材多选 chips、分组筛选、结果计数与可点卡片详情。视觉走清新绿意 + 珊瑚点缀。

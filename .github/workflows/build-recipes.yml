@@ -1,0 +1,31 @@
+name: Build recipes from txt
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - recipes.txt
+      - scripts/build-recipes.py
+      - .github/workflows/build-recipes.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build recipes.json
+        run: python3 scripts/build-recipes.py
+
+      - name: Commit updated JSON
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "chore: rebuild recipes.json from recipes.txt"
+          file_pattern: data/recipes.json
+          commit_user_name: github-actions[bot]
+          commit_user_email: github-actions[bot]@users.noreply.github.com

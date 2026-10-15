@@ -680,7 +680,7 @@
   }
 
   async function init() {
-    const res = await fetch("./data/recipes.json?v=2");
+    const res = await fetch("./data/recipes.json?v=3");
     state.data = await res.json();
     try {
       const saved = localStorage.getItem("mise-view");
