@@ -4,6 +4,8 @@
 
 **在线地址：** https://jon-hao.github.io/Mise/
 
+桌面图标 / 浏览器标签图标见 `icons/` 与 `manifest.webmanifest`（支持「添加到主屏幕」）。
+
 ## 更新菜谱（只改一个文件）
 
 源文件是仓库根目录的 **[`recipes.txt`](./recipes.txt)**。
